@@ -27,6 +27,14 @@ module Program =
         CreateHostBuilder(args).Build().Run()
 
         let a = Product.create "PD1" "Product Name" 99.95m
-        let b = Product.setName "Blah" a
+        let b = Result.bind (Product.setName "Blah") a
+        let c = Result.bind (Product.setPrice 49.95m) b
+
+        match c with
+        | Ok product -> printfn "We have a product %s" (Product.getName product)
+        | Error e -> match e with
+                        | CreationError creationErrors -> List.iter (fun (error: string) -> Console.WriteLine(error)) creationErrors
+                        | SetNameError error -> Console.WriteLine(error)
+                        | SetPriceError error -> Console.WriteLine(error)
 
         exitCode
