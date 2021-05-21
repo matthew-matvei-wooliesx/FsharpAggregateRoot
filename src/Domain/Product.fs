@@ -2,7 +2,17 @@
 
 open System
 
-type Product = private { id: string; name: string; price: decimal }
+type ProductEvent =
+    | ProductCreated of id: string * name : string * price : decimal
+    | NameSet of name : string
+    | PriceSet of price : decimal
+
+type Product = private {
+    id: string;
+    name: string;
+    price: decimal;
+    uncommittedEvents: ProductEvent list
+}
 
 type ProductError =
     | CreationError of string list
@@ -27,9 +37,22 @@ module Product =
     let create id name price =
         let validationErrors = validateCreate id name price
         if List.isEmpty validationErrors then
-            Ok { id = id; name = name; price = price }
+            Ok { id = id; name = name; price = price; uncommittedEvents = [ProductCreated(id, name, price)] }
         else
             Error (CreationError validationErrors)
+
+    let fromEvents productEvents =
+        let initialProduct: Product = { id = ""; name = ""; price = 0m; uncommittedEvents = [] }
+        let applyEvent product event =
+            match event with
+            | ProductCreated (id, name, price) -> { product with id = id; name = name; price = price }
+            | NameSet name -> { product with name = name }
+            | PriceSet price -> { product with price = price }
+
+        List.fold applyEvent initialProduct productEvents
+
+    let getId (product: Product) =
+        product.id
 
     let getName (product: Product) =
         product.name
@@ -38,10 +61,14 @@ module Product =
         if String.IsNullOrWhiteSpace(name) then
             Error (SetNameError "name must be defined")
         else
-            Ok { product with name = name }
+            Ok { product with name = name; uncommittedEvents = List.append product.uncommittedEvents [NameSet(name)] }
 
     let setPrice price product =
         if price < 0m then
             Error (SetPriceError "price must not be negative")
         else
-            Ok { product with price = price }
+            Ok { product with price = price; uncommittedEvents = List.append product.uncommittedEvents [PriceSet(price)] }
+
+    let commitUncommittedEvents (product: Product) =
+        let events = product.uncommittedEvents
+        ({ product with uncommittedEvents = [] }, events)
